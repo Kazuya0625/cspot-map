@@ -46,22 +46,22 @@ function App() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("object");
   const [spots, setSpots] = useState<Spot[]>(() => {
-  const savedSpots = localStorage.getItem("cspot-map-spots");
+    const savedSpots = localStorage.getItem("cspot-map-spots");
 
-  if (!savedSpots) {
-    return [];
-  }
+    if (!savedSpots) {
+      return [];
+    }
 
-  try {
-    return JSON.parse(savedSpots) as Spot[];
-  } catch {
-    return [];
-  }
-});
+    try {
+      return JSON.parse(savedSpots) as Spot[];
+    } catch {
+      return [];
+    }
+  });
 
- useEffect(() => {
-  localStorage.setItem("cspot-map-spots", JSON.stringify(spots));
-}, [spots]);
+  useEffect(() => {
+    localStorage.setItem("cspot-map-spots", JSON.stringify(spots));
+  }, [spots]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -144,6 +144,8 @@ function App() {
                 <strong>{spot.title}</strong>
                 <br />
                 {spot.description}
+                <br />
+                カテゴリ: {spot.category}
               </Popup>
             </CircleMarker>
           ))}
@@ -162,8 +164,8 @@ function App() {
         <p>
           {selectedPosition
             ? `選択位置：${selectedPosition.latitude.toFixed(
-                6,
-              )}, ${selectedPosition.longitude.toFixed(6)}`
+              6,
+            )}, ${selectedPosition.longitude.toFixed(6)}`
             : "最初に地図をクリックして場所を選んでください。"}
         </p>
 
@@ -243,6 +245,49 @@ function App() {
             仮投稿する
           </button>
         </form>
+        <section
+          style={{
+            marginTop: 24,
+            display: "grid",
+            gap: 12,
+          }}
+        >
+          <h2>投稿一覧</h2>
+
+          {spots.length === 0 ? (
+            <p>まだ投稿はありません。</p>
+          ) : (
+            spots.map((spot) => (
+              <article
+                key={spot.id}
+                style={{
+                  padding: 16,
+                  background: "white",
+                  borderRadius: 8,
+                  border: "1px solid #ddd",
+                }}
+              >
+                <h3 style={{ marginTop: 0 }}>{spot.title}</h3>
+
+                <p>{spot.description}</p>
+
+                <p>カテゴリ：{spot.category}</p>
+
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: "#666",
+                    marginBottom: 0,
+                  }}
+                >
+                  緯度：{spot.latitude.toFixed(6)}
+                  <br />
+                  経度：{spot.longitude.toFixed(6)}
+                </p>
+              </article>
+            ))
+          )}
+        </section>
       </main>
     </div>
   );
