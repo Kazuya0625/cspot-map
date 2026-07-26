@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import {
   CircleMarker,
   MapContainer,
@@ -8,13 +9,20 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
-type SelectedPosition = {
+type Position = {
   latitude: number;
   longitude: number;
 };
 
+type Spot = Position & {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+};
+
 type MapClickHandlerProps = {
-  onSelect: (position: SelectedPosition) => void;
+  onSelect: (position: Position) => void;
 };
 
 function MapClickHandler({ onSelect }: MapClickHandlerProps) {
@@ -32,58 +40,210 @@ function MapClickHandler({ onSelect }: MapClickHandlerProps) {
 
 function App() {
   const [selectedPosition, setSelectedPosition] =
-    useState<SelectedPosition | null>(null);
+    useState<Position | null>(null);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("object");
+  const [spots, setSpots] = useState<Spot[]>(() => {
+  const savedSpots = localStorage.getItem("cspot-map-spots");
+
+  if (!savedSpots) {
+    return [];
+  }
+
+  try {
+    return JSON.parse(savedSpots) as Spot[];
+  } catch {
+    return [];
+  }
+});
+
+ useEffect(() => {
+  localStorage.setItem("cspot-map-spots", JSON.stringify(spots));
+}, [spots]);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedPosition) {
+      alert("地図をクリックして場所を選んでください。");
+      return;
+    }
+
+    if (!title.trim() || !description.trim()) {
+      alert("タイトルと説明を入力してください。");
+      return;
+    }
+
+    const newSpot: Spot = {
+      id: crypto.randomUUID(),
+      title: title.trim(),
+      description: description.trim(),
+      category,
+      ...selectedPosition,
+    };
+
+    setSpots((currentSpots) => [...currentSpots, newSpot]);
+
+    setTitle("");
+    setDescription("");
+    setCategory("object");
+    setSelectedPosition(null);
+
+    alert("C級スポットを仮登録しました。");
+  }
 
   return (
-    <div style={{ height: "100vh", position: "relative" }}>
-      <MapContainer
-        center={[35.681236, 139.767125]}
-        zoom={13}
-        style={{ height: "100%", width: "100%" }}
-      >
-        <TileLayer
-          attribution="&copy; OpenStreetMap contributors"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-        <MapClickHandler onSelect={setSelectedPosition} />
-
-        {selectedPosition && (
-          <CircleMarker
-            center={[
-              selectedPosition.latitude,
-              selectedPosition.longitude,
-            ]}
-            radius={10}
-          >
-            <Popup>投稿する場所</Popup>
-          </CircleMarker>
-        )}
-      </MapContainer>
-
-      <div
+    <div style={{ minHeight: "100vh", background: "#f5f5f5" }}>
+      <header
         style={{
-          position: "absolute",
-          zIndex: 1000,
-          bottom: 20,
-          left: 20,
-          padding: 16,
+          padding: "12px 20px",
           background: "white",
-          borderRadius: 8,
-          boxShadow: "0 2px 10px rgba(0, 0, 0, 0.25)",
+          borderBottom: "1px solid #ddd",
         }}
       >
-        <strong>選択した場所</strong>
+        <h1 style={{ margin: 0 }}>C Spot Map</h1>
+        <p style={{ margin: "4px 0 0" }}>
+          変化のない日常に、小さな発見を。
+        </p>
+      </header>
 
-        {selectedPosition ? (
-          <>
-            <div>緯度：{selectedPosition.latitude.toFixed(6)}</div>
-            <div>経度：{selectedPosition.longitude.toFixed(6)}</div>
-          </>
-        ) : (
-          <div>地図をクリックしてください</div>
-        )}
+      <div style={{ height: "55vh" }}>
+        <MapContainer
+          center={[35.681236, 139.767125]}
+          zoom={13}
+          style={{ height: "100%", width: "100%" }}
+        >
+          <TileLayer
+            attribution="&copy; OpenStreetMap contributors"
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          <MapClickHandler onSelect={setSelectedPosition} />
+
+          {selectedPosition && (
+            <CircleMarker
+              center={[
+                selectedPosition.latitude,
+                selectedPosition.longitude,
+              ]}
+              radius={10}
+            >
+              <Popup>投稿予定の場所</Popup>
+            </CircleMarker>
+          )}
+
+          {spots.map((spot) => (
+            <CircleMarker
+              key={spot.id}
+              center={[spot.latitude, spot.longitude]}
+              radius={10}
+            >
+              <Popup>
+                <strong>{spot.title}</strong>
+                <br />
+                {spot.description}
+              </Popup>
+            </CircleMarker>
+          ))}
+        </MapContainer>
       </div>
+
+      <main
+        style={{
+          maxWidth: 600,
+          margin: "0 auto",
+          padding: 20,
+        }}
+      >
+        <h2>スポットを投稿する</h2>
+
+        <p>
+          {selectedPosition
+            ? `選択位置：${selectedPosition.latitude.toFixed(
+                6,
+              )}, ${selectedPosition.longitude.toFixed(6)}`
+            : "最初に地図をクリックして場所を選んでください。"}
+        </p>
+
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: "grid",
+            gap: 12,
+            padding: 20,
+            background: "white",
+            borderRadius: 8,
+          }}
+        >
+          <label>
+            タイトル
+            <input
+              type="text"
+              value={title}
+              maxLength={100}
+              onChange={(event) => setTitle(event.target.value)}
+              style={{
+                display: "block",
+                width: "100%",
+                boxSizing: "border-box",
+                marginTop: 4,
+                padding: 10,
+              }}
+            />
+          </label>
+
+          <label>
+            説明
+            <textarea
+              value={description}
+              maxLength={500}
+              rows={4}
+              onChange={(event) => setDescription(event.target.value)}
+              style={{
+                display: "block",
+                width: "100%",
+                boxSizing: "border-box",
+                marginTop: 4,
+                padding: 10,
+              }}
+            />
+          </label>
+
+          <label>
+            カテゴリ
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+              style={{
+                display: "block",
+                width: "100%",
+                marginTop: 4,
+                padding: 10,
+              }}
+            >
+              <option value="object">謎のオブジェ</option>
+              <option value="statue">石像・人物像</option>
+              <option value="sign">看板・標識</option>
+              <option value="retro">レトロ</option>
+              <option value="building">建物・設備</option>
+              <option value="other">その他</option>
+            </select>
+          </label>
+
+          <button
+            type="submit"
+            style={{
+              padding: 12,
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            仮投稿する
+          </button>
+        </form>
+      </main>
     </div>
   );
 }
