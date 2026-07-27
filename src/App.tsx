@@ -94,6 +94,20 @@ function App() {
     alert("C級スポットを仮登録しました。");
   }
 
+  function handleDelete(id: string) {
+    const shouldDelete = window.confirm(
+      "このスポットを削除しますか？",
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setSpots((currentSpots) =>
+      currentSpots.filter((spot) => spot.id !== id),
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#f5f5f5" }}>
       <header
@@ -284,6 +298,18 @@ function App() {
                   <br />
                   経度：{spot.longitude.toFixed(6)}
                 </p>
+
+                <button
+                  type="button"
+                  onClick={() => handleDelete(spot.id)}
+                  style={{
+                    marginTop: 12,
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                  }}
+                >
+                  削除する
+                </button>
               </article>
             ))
           )}
