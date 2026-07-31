@@ -9,6 +9,7 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
+
 type Position = {
   latitude: number;
   longitude: number;
@@ -19,7 +20,9 @@ type Spot = Position & {
   title: string;
   description: string;
   category: string;
+  createdAt: string;
 };
+
 
 type MapClickHandlerProps = {
   onSelect: (position: Position) => void;
@@ -45,25 +48,32 @@ function App() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("object");
-  const [spots, setSpots] = useState<Spot[]>(() => {
-    const savedSpots = localStorage.getItem("cspot-map-spots");
-
-    if (!savedSpots) {
-      return [];
-    }
-
-    try {
-      return JSON.parse(savedSpots) as Spot[];
-    } catch {
-      return [];
-    }
-  });
+  const [spots, setSpots] = useState<Spot[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    localStorage.setItem("cspot-map-spots", JSON.stringify(spots));
-  }, [spots]);
+    async function fetchSpots() {
+      try {
+        const response = await fetch("/api/spots");
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+        if (!response.ok) {
+          throw new Error(`スポットの取得に失敗しました: ${response.status}`);
+        }
+
+        const data = (await response.json()) as Spot[];
+        setSpots(data);
+      } catch (error) {
+        console.error(error);
+        alert("投稿一覧を取得できませんでした。");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void fetchSpots();
+  }, []);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!selectedPosition) {
@@ -76,37 +86,84 @@ function App() {
       return;
     }
 
-    const newSpot: Spot = {
-      id: crypto.randomUUID(),
-      title: title.trim(),
-      description: description.trim(),
-      category,
-      ...selectedPosition,
-    };
+    try {
+      const response = await fetch("/api/spots", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim(),
+          category,
+          ...selectedPosition,
+        }),
+      });
 
-    setSpots((currentSpots) => [...currentSpots, newSpot]);
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
 
-    setTitle("");
-    setDescription("");
-    setCategory("object");
-    setSelectedPosition(null);
+        throw new Error(
+          errorBody?.message ?? `投稿に失敗しました: ${response.status}`,
+        );
+      }
 
-    alert("C級スポットを仮登録しました。");
+      const createdSpot = (await response.json()) as Spot;
+
+      setSpots((currentSpots) => [createdSpot, ...currentSpots]);
+
+      setTitle("");
+      setDescription("");
+      setCategory("object");
+      setSelectedPosition(null);
+
+      alert("C級スポットを登録しました。");
+    } catch (error) {
+      console.error(error);
+      alert("スポットを登録できませんでした。");
+    }
   }
 
-  function handleDelete(id: string) {
-    const shouldDelete = window.confirm(
-      "このスポットを削除しますか？",
+  async function handleDelete(spot: Spot) {
+  const shouldDelete = window.confirm(
+    "このスポットを削除しますか？",
+  );
+
+  if (!shouldDelete) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `/api/spots/${encodeURIComponent(spot.id)}?category=${encodeURIComponent(
+        spot.category,
+      )}`,
+      {
+        method: "DELETE",
+      },
     );
 
-    if (!shouldDelete) {
-      return;
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => null);
+
+      throw new Error(
+        errorBody?.message ??
+          `スポットの削除に失敗しました: ${response.status}`,
+      );
     }
 
     setSpots((currentSpots) =>
-      currentSpots.filter((spot) => spot.id !== id),
+      currentSpots.filter(
+        (currentSpot) => currentSpot.id !== spot.id,
+      ),
     );
+
+    alert("C級スポットを削除しました。");
+  } catch (error) {
+    console.error(error);
+    alert("スポットを削除できませんでした。");
   }
+}
 
   return (
     <div style={{ minHeight: "100vh", background: "#f5f5f5" }}>
@@ -268,7 +325,9 @@ function App() {
         >
           <h2>投稿一覧</h2>
 
-          {spots.length === 0 ? (
+          {isLoading ? (
+            <p>投稿を読み込んでいます...</p>
+          ) : spots.length === 0 ? (
             <p>まだ投稿はありません。</p>
           ) : (
             spots.map((spot) => (
@@ -301,7 +360,7 @@ function App() {
 
                 <button
                   type="button"
-                  onClick={() => handleDelete(spot.id)}
+                  onClick={() => void handleDelete(spot)}
                   style={{
                     marginTop: 12,
                     padding: "8px 12px",
